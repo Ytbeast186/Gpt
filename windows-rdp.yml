@@ -1,0 +1,44 @@
+
+name: Free Windows 11 RDP
+
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+    - name: Setup RDP user
+      run: |
+        net user runneradmin YourPassword123 /add
+        net localgroup administrators runneradmin /add
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+    - name: Download ngrok
+      run: |
+        Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
+        Expand-Archive ngrok.zip -DestinationPath $env:USERPROFILE
+
+    - name: Start ngrok tunnel
+      run: |
+        & "$env:USERPROFILE\ngrok.exe" authtoken 2xvYvR3BC5I1ZtwKqyyYnI6MPsp_5YqYeVSS9mL9ofuQhBE55
+        Start-Process -NoNewWindow -FilePath "$env:USERPROFILE\ngrok.exe" -ArgumentList "tcp 3389"
+        Start-Sleep -Seconds 20
+
+    - name: Show connection info
+      run: |
+        Invoke-WebRequest -UseBasicParsing http://127.0.0.1:4040/api/tunnels > tunnels.json
+        $content = Get-Content tunnels.json | Out-String | ConvertFrom-Json
+        $rdp = $content.tunnels[0].public_url -replace "tcp://", ""
+        Write-Output "🌐 RDP address (use in RDP client): $rdp"
+        Write-Output "👤 Username: runneradmin"
+        Write-Output "🔑 Password: YourPassword123"
+
+    - name: Keep session alive
+      run: |
+        for ($i=0; $i -lt 21600; $i++) {
+          Write-Host "🕹️ Staying alive for gaming... $i seconds"
+          Start-Sleep -Seconds 1
+        }
